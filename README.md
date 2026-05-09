@@ -77,11 +77,12 @@ DEBUG=1 python3 proxy.py
 - **响应方向**：Claude Code 返回的工具名 → 第三方客户端工具名（自动反向映射）
 - **移除不支持的工具**：`_remove` 列表中的工具会被直接丢弃（如 `canvas`、`browser` 等 Claude Code 不存在的工具）
 
-映射表分两类：
+映射表分三类：
 - `direct`：功能直接对应的工具（如 `read` ↔ `Read`）
 - `borrowed`：借用 Claude Code 已有工具名的映射（如 `memory_search` → `Glob`），保留原始 schema 不变
+- `_padding`：当 Claude Code 新增了工具但暂时没法和第三方客户端对应时，把 CC 工具名加到这里，代理会从 `cc_tools_baseline.json` 取真实 schema 注入，让请求工具集更接近真实 Claude Code（第三方客户端不会调用这些工具，纯粹补齐指纹）。如果之后能找到对应的第三方工具，把它从 `_padding` 移到 `borrowed` 即可
 
-如需自定义，编辑 `tool_name_mapping.json` 即可。
+如需自定义，编辑 `tool_name_mapping.json` 即可。Claude Code 升级后如果工具集发生变化，可能需要重新抓取 baseline 并调整映射。
 
 ## System Prompt 处理
 

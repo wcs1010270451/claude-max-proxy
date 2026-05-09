@@ -1,6 +1,7 @@
 {
-  "_comment": "OpenClaw tool name → Claude Code tool name 映射表。请求时 OC→CC，响应时 CC→OC。基于 Claude Code 2.1.97 / CC tools baseline 2026-04-09",
-  "_remove": ["feishu_doc", "feishu_app_scopes", "feishu_chat", "feishu_wiki", "feishu_drive", "feishu_bitable_get_meta", "feishu_bitable_list_fields", "feishu_bitable_list_records", "feishu_bitable_get_record", "feishu_bitable_create_record", "feishu_bitable_update_record", "feishu_bitable_create_app", "feishu_bitable_create_field", "canvas", "browser", "image_generate"],
+  "_comment": "OpenClaw tool name → Claude Code tool name 映射表。请求时 OC→CC，响应时 CC→OC。基于 Claude Code 2.1.133 / CC tools baseline 2026-05-09。_padding: CC 出了新工具但还没找到 OC 对应物时用，从 baseline 取真实 schema 注入仅作指纹补齐。",
+  "_remove": ["feishu_doc", "feishu_app_scopes", "feishu_chat", "feishu_wiki", "feishu_drive", "feishu_bitable_get_meta", "feishu_bitable_list_fields", "feishu_bitable_list_records", "feishu_bitable_get_record", "feishu_bitable_create_record", "feishu_bitable_update_record", "feishu_bitable_create_app", "feishu_bitable_create_field"],
+  "_padding": [],
   "direct": {
     "read": "Read",
     "edit": "Edit",
@@ -25,8 +26,11 @@
     "agents_list": "ExitPlanMode",
     "image": "NotebookEdit",
     "pdf": "Skill",
-    "tts": "RemoteTrigger",
+    "tts": "PushNotification",
     "gateway": "CronDelete",
-    "nodes": "mcp__claude_ai_Gmail__authenticate"
+    "nodes": "RemoteTrigger",
+    "browser": "Monitor",
+    "canvas": "mcp__claude_ai_Gmail__authenticate",
+    "image_generate": "ScheduleWakeup"
   }
 }

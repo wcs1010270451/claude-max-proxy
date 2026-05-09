@@ -141,16 +141,25 @@ with open(_MAPPING_FILE) as _f:
     _mapping = json.load(_f)
 
 REMOVE_TOOLS = set(_mapping["_remove"])
+PADDING_TOOLS = _mapping.get("_padding", [])
 OC_TO_CC = {**_mapping["direct"], **_mapping["borrowed"]}
 CC_TO_OC = {v: k for k, v in OC_TO_CC.items()}
 
+# 加载 CC tool baseline 用于 padding（指纹补齐）
+_BASELINE_FILE = os.path.join(os.path.dirname(__file__), "cc_tools_baseline.json")
+with open(_BASELINE_FILE) as _f:
+    _baseline = json.load(_f)
+_BASELINE_BY_NAME = {t["name"]: t for t in _baseline}
+
 def replace_tools(body: dict) -> None:
-    """替换 tool 名称：移除不需要的，把 OC 名改成 CC 名，保留原始 schema"""
+    """替换 tool 名称：移除不需要的，把 OC 名改成 CC 名，保留原始 schema。
+    末尾追加 padding tools（用 CC 真实 schema），让指纹更接近真实 CC。"""
     tools = body.get("tools")
     if not tools:
         return
 
     new_tools = []
+    used_cc_names = set()
     for t in tools:
         name = t.get("name")
         if name in REMOVE_TOOLS:
@@ -158,9 +167,20 @@ def replace_tools(body: dict) -> None:
         if name in OC_TO_CC:
             t = {**t, "name": OC_TO_CC[name]}
         new_tools.append(t)
+        used_cc_names.add(t["name"])
+
+    # 追加 padding：CC 新工具用真实 schema 注入，第三方客户端不会调用
+    padding_added = []
+    for cc_name in PADDING_TOOLS:
+        if cc_name in used_cc_names:
+            continue
+        if cc_name not in _BASELINE_BY_NAME:
+            continue
+        new_tools.append(_BASELINE_BY_NAME[cc_name])
+        padding_added.append(cc_name)
 
     body["tools"] = new_tools
-    sys.stdout.write(f"[proxy] tools: {len(new_tools)} mapped (removed {len(tools) - len(new_tools)}), "
+    sys.stdout.write(f"[proxy] tools: {len(new_tools)} total (mapped from {len(tools)}, padded +{len(padding_added)}={padding_added}), "
                      f"names={[t['name'] for t in new_tools]}\n")
     sys.stdout.flush()
 
