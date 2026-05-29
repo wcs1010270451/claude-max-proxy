@@ -12,6 +12,7 @@ Claude Max → Standard API 代理网关 v3
 
 import json
 import os
+import subprocess
 import sys
 import time
 import uuid
@@ -49,7 +50,7 @@ def detect_cc_version():
     build_cache = os.path.join(os.path.dirname(__file__), ".cc_build")
     build_num = "190"
     if os.path.exists(build_cache):
-        with open(build_cache) as f:
+        with open(build_cache, encoding="utf-8") as f:
             cached = f.read().strip()
             if cached:
                 build_num = cached
@@ -64,16 +65,25 @@ CC_FULL_VERSION = f"{CC_VERSION}.{CC_BUILD}"
 # ============================================================
 
 def load_credentials():
-    with open(CREDENTIALS_FILE) as f:
+    with open(CREDENTIALS_FILE, encoding="utf-8") as f:
         return json.load(f)["claudeAiOauth"]
 
-def get_access_token():
+def refresh_credentials():
+    subprocess.run(
+        ["claude", "--print", "ping"],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        timeout=60,
+        check=False,
+    )
+
+def get_access_token(force_refresh: bool = False):
     cred = load_credentials()
     expires_at = cred.get("expiresAt", 0)
-    if time.time() * 1000 > expires_at - 300_000:
-        sys.stdout.write("[proxy] Token expiring, refreshing via claude --print...\n")
+    if force_refresh or time.time() * 1000 > expires_at - 300_000:
+        sys.stdout.write("[proxy] Refreshing token via claude --print...\n")
         sys.stdout.flush()
-        os.system('claude --print "ping" > /dev/null 2>&1')
+        refresh_credentials()
         cred = load_credentials()
     return cred["accessToken"]
 
@@ -137,7 +147,7 @@ def sanitize_body(body_str: str) -> str:
 
 # 加载 tool 名称映射表
 _MAPPING_FILE = os.path.join(os.path.dirname(__file__), "tool_name_mapping.json")
-with open(_MAPPING_FILE) as _f:
+with open(_MAPPING_FILE, encoding="utf-8") as _f:
     _mapping = json.load(_f)
 
 REMOVE_TOOLS = set(_mapping["_remove"])
@@ -147,7 +157,7 @@ CC_TO_OC = {v: k for k, v in OC_TO_CC.items()}
 
 # 加载 CC tool baseline 用于 padding（指纹补齐）
 _BASELINE_FILE = os.path.join(os.path.dirname(__file__), "cc_tools_baseline.json")
-with open(_BASELINE_FILE) as _f:
+with open(_BASELINE_FILE, encoding="utf-8") as _f:
     _baseline = json.load(_f)
 _BASELINE_BY_NAME = {t["name"]: t for t in _baseline}
 
@@ -283,7 +293,7 @@ def proxy_messages():
 
     if DEBUG:
         if len(raw) > 1000:
-            with open("/tmp/proxy_neo_raw.json", "w") as df:
+            with open("/tmp/proxy_neo_raw.json", "w", encoding="utf-8") as df:
                 df.write(raw)
 
     replace_tools(body)
@@ -310,6 +320,21 @@ def proxy_messages():
         stream=is_stream,
         timeout=300,
     )
+
+    if resp.status_code == 401:
+        sys.stdout.write("[proxy] Authentication failed, refreshing token and retrying once...\n")
+        sys.stdout.flush()
+        access_token = get_access_token(force_refresh=True)
+        headers = build_headers(access_token)
+        if is_stream:
+            headers["Accept"] = "text/event-stream"
+        resp = requests.post(
+            f"{UPSTREAM}/v1/messages?beta=true",
+            data=body_bytes,
+            headers=headers,
+            stream=is_stream,
+            timeout=300,
+        )
 
     sys.stdout.write(f"[proxy] ← status={resp.status_code}\n")
     if resp.status_code >= 400:
@@ -375,4 +400,4 @@ if __name__ == "__main__":
     if DEBUG:
         print(f"🔍 DEBUG mode ON (request dumps → /tmp/)")
     print()
-    app.run(host="0.0.0.0", port=PORT, debug=False)
+    app.run(host="127.0.0.1", port=PORT, debug=False)
