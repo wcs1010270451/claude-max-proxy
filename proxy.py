@@ -12,6 +12,7 @@ Claude Max → Standard API 代理网关 v3
 
 import json
 import os
+import shutil
 import subprocess
 import sys
 import time
@@ -32,6 +33,7 @@ PORT = int(os.environ.get("PORT", "5678"))
 
 CLAUDE_DIR = os.path.expanduser("~/.claude")
 CREDENTIALS_FILE = os.path.join(CLAUDE_DIR, ".credentials.json")
+CLAUDE_BIN = os.environ.get("CLAUDE_BIN") or shutil.which("claude") or os.path.expanduser("~/.local/bin/claude")
 
 UPSTREAM = "https://api.anthropic.com"
 CCH_SEED = 0x6E52736AC806831E
@@ -41,7 +43,7 @@ def detect_cc_version():
     import subprocess
     import re
     try:
-        out = subprocess.check_output(["claude", "--version"], timeout=5, text=True).strip()
+        out = subprocess.check_output([CLAUDE_BIN, "--version"], timeout=5, text=True).strip()
         m = re.search(r'(\d+\.\d+\.\d+)', out)
         main_ver = m.group(1) if m else "2.1.92"
     except:
@@ -70,7 +72,7 @@ def load_credentials():
 
 def refresh_credentials():
     subprocess.run(
-        ["claude", "--print", "ping"],
+        [CLAUDE_BIN, "--print", "ping"],
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
         timeout=60,
