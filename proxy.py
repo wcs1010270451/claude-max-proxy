@@ -377,7 +377,29 @@ def health():
     try:
         cred = load_credentials()
         remaining = (cred.get("expiresAt", 0) / 1000 - time.time()) / 3600
-        return {"status": "ok", "token_hours": round(remaining, 1), "cc_version": CC_FULL_VERSION}
+        return {
+            "status": "ok",
+            "token_hours": round(remaining, 1),
+            "cc_version": CC_FULL_VERSION,
+            "subscription_type": cred.get("subscriptionType"),
+            "rate_limit_tier": cred.get("rateLimitTier"),
+        }
+    except Exception as e:
+        return {"status": "error", "error": str(e)}, 500
+
+@app.route("/refresh", methods=["POST"])
+def refresh():
+    try:
+        get_access_token(force_refresh=True)
+        cred = load_credentials()
+        remaining = (cred.get("expiresAt", 0) / 1000 - time.time()) / 3600
+        return {
+            "status": "ok",
+            "token_hours": round(remaining, 1),
+            "cc_version": CC_FULL_VERSION,
+            "subscription_type": cred.get("subscriptionType"),
+            "rate_limit_tier": cred.get("rateLimitTier"),
+        }
     except Exception as e:
         return {"status": "error", "error": str(e)}, 500
 
